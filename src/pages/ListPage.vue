@@ -119,7 +119,7 @@
             <div
               v-for="item in group.items"
               :key="item.id"
-              class="flex items-center justify-between rounded-xl border border-input p-3 transition"
+              class="flex flex-col gap-3 rounded-xl border border-input p-3 transition sm:flex-row sm:items-center sm:justify-between"
               :class="item.checked ? 'bg-muted/50 text-muted-foreground' : 'bg-card'"
             >
               <button class="flex items-center gap-3 text-left" @click="toggleItem(item.id)">
@@ -133,7 +133,7 @@
                   {{ formatItemName(item) }}
                 </span>
               </button>
-              <div class="flex items-center gap-2">
+              <div class="flex flex-wrap items-center gap-2 sm:justify-end">
                 <button
                   class="rounded-full border border-input bg-card/80 p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                   type="button"
