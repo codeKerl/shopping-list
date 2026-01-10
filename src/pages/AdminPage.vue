@@ -69,7 +69,7 @@
             </div>
             <div class="space-y-2">
               <div
-                v-for="category in orderedCategories(storeItem)"
+                v-for="(category, index) in orderedCategories(storeItem)"
                 :key="category.id"
                 class="flex items-center justify-between rounded-xl border border-input bg-muted/40 p-3 text-sm"
                 :data-store-id="storeItem.id"
@@ -80,16 +80,24 @@
                 @drop="onDrop(storeItem.id, category.id)"
               >
                 <span class="font-medium">{{ category.name }}</span>
-                <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span class="hidden sm:inline">{{ t('admin.stores.drag') }}</span>
+                <div class="flex items-center gap-2">
                   <button
                     type="button"
-                    class="flex h-8 w-8 items-center justify-center rounded-full border border-input bg-card/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                    aria-label="Hold to drag"
-                    @pointerdown="onHandlePointerDown($event, storeItem.id, category.id)"
+                    class="flex h-8 w-8 items-center justify-center rounded-full border border-input bg-card/80 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-40"
+                    :aria-label="t('admin.stores.moveUp')"
+                    :disabled="index === 0"
+                    @click="moveCategory(storeItem.id, category.id, -1)"
                   >
-                    <GripHorizontalIcon class="h-4 w-4" />
-                    <span class="sr-only">Drag</span>
+                    <ChevronUpIcon class="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    class="flex h-8 w-8 items-center justify-center rounded-full border border-input bg-card/80 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-40"
+                    :aria-label="t('admin.stores.moveDown')"
+                    :disabled="index === orderedCategories(storeItem).length - 1"
+                    @click="moveCategory(storeItem.id, category.id, 1)"
+                  >
+                    <ChevronDownIcon class="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -214,7 +222,7 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { useShoppingStore, type StoreConfig, type Category } from '@/stores/shopping'
-import { GripHorizontalIcon, TrashIcon } from '@radix-icons/vue'
+import { ChevronDownIcon, ChevronUpIcon, TrashIcon } from '@radix-icons/vue'
 import { useI18n } from '@/composables/useI18n'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 
@@ -227,8 +235,6 @@ const productSearch = ref('')
 const draggedId = ref<string | null>(null)
 const unitEdits = ref<Record<string, string>>({})
 const activeLayer = ref<'stores' | 'units' | 'products' | 'system'>('stores')
-const dragTouch = ref<{ storeId: string; categoryId: string } | null>(null)
-let dragHoldTimer: number | null = null
 
 onMounted(() => {
   store.units.forEach((unit) => {
@@ -306,56 +312,15 @@ const onDrop = (storeId: string, targetId: string) => {
   draggedId.value = null
 }
 
-const onHandlePointerDown = (event: PointerEvent, storeId: string, categoryId: string) => {
-  if (event.pointerType !== 'touch') return
-  event.preventDefault()
-  if (dragHoldTimer) {
-    window.clearTimeout(dragHoldTimer)
-  }
-  const cancelHold = () => {
-    if (dragHoldTimer) {
-      window.clearTimeout(dragHoldTimer)
-      dragHoldTimer = null
-    }
-  }
-  window.addEventListener('pointerup', cancelHold, { once: true })
-  window.addEventListener('pointercancel', cancelHold, { once: true })
-  dragHoldTimer = window.setTimeout(() => {
-    dragHoldTimer = null
-    dragTouch.value = { storeId, categoryId }
-    window.addEventListener('pointermove', onTouchDragMove)
-    window.addEventListener('pointerup', endTouchDrag, { once: true })
-    window.addEventListener('pointercancel', endTouchDrag, { once: true })
-  }, 200)
-}
-
-const onTouchDragMove = (event: PointerEvent) => {
-  if (!dragTouch.value) return
-  const target = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null
-  const row = target?.closest?.('[data-category-id]') as HTMLElement | null
-  if (!row) return
-  const targetId = row.dataset.categoryId
-  const storeId = row.dataset.storeId
-  if (!targetId || !storeId || storeId !== dragTouch.value.storeId) return
-  if (targetId === dragTouch.value.categoryId) return
+const moveCategory = (storeId: string, categoryId: string, direction: -1 | 1) => {
   const storeItem = store.stores.find((item) => item.id === storeId)
   if (!storeItem) return
   const ordered = orderedCategories(storeItem).map((category) => category.id)
-  const from = ordered.indexOf(dragTouch.value.categoryId)
-  const to = ordered.indexOf(targetId)
-  if (from === -1 || to === -1) return
+  const from = ordered.indexOf(categoryId)
+  const to = from + direction
+  if (from === -1 || to < 0 || to >= ordered.length) return
   ordered.splice(to, 0, ordered.splice(from, 1)[0])
   store.setStoreOrder(storeId, ordered)
-  dragTouch.value.categoryId = targetId
-}
-
-const endTouchDrag = () => {
-  if (dragHoldTimer) {
-    window.clearTimeout(dragHoldTimer)
-    dragHoldTimer = null
-  }
-  dragTouch.value = null
-  window.removeEventListener('pointermove', onTouchDragMove)
 }
 
 const categoryName = (id?: string) => {
