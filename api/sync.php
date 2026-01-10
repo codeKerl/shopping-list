@@ -341,7 +341,8 @@ foreach ($events as $event) {
             break;
         case 'settings:locale':
             $locale = isset($payload['locale']) ? (string)$payload['locale'] : 'de';
-            $state['locale'] = $locale === 'en' ? 'en' : 'de';
+            $allowed = ['de', 'en', 'fr', 'es'];
+            $state['locale'] = in_array($locale, $allowed, true) ? $locale : 'de';
             break;
         case 'list:remove':
             $listId = isset($payload['listId']) ? (string)$payload['listId'] : '';

@@ -50,7 +50,7 @@ export interface ShoppingState {
   activeListId?: string
   revision?: string
   syncQueueCount: number
-  locale: 'de' | 'en'
+  locale: 'de' | 'en' | 'fr' | 'es'
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
@@ -156,7 +156,7 @@ export const useShoppingStore = defineStore('shopping', {
       }
       this.persist()
     },
-    setLocale(locale: 'de' | 'en') {
+    setLocale(locale: 'de' | 'en' | 'fr' | 'es') {
       this.locale = locale
       this.persist()
       this.enqueueEvent('settings:locale', { locale })

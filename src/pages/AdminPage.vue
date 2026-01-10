@@ -1,18 +1,9 @@
 <template>
   <div class="space-y-6">
     <Card class="flex flex-col gap-4">
-      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('admin.subtitle') }}</p>
-          <h2 class="text-2xl font-semibold">{{ t('admin.title') }}</h2>
-        </div>
-        <div class="w-full max-w-xs space-y-2">
-          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('admin.language') }}</p>
-          <Select v-model="locale">
-            <option value="de">Deutsch</option>
-            <option value="en">English</option>
-          </Select>
-        </div>
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('admin.subtitle') }}</p>
+        <h2 class="text-2xl font-semibold">{{ t('admin.title') }}</h2>
       </div>
       <div class="flex flex-wrap gap-2">
         <Button :variant="activeLayer === 'stores' ? 'default' : 'outline'" size="sm" @click="activeLayer = 'stores'">
@@ -23,6 +14,9 @@
         </Button>
         <Button :variant="activeLayer === 'products' ? 'default' : 'outline'" size="sm" @click="activeLayer = 'products'">
           {{ t('admin.nav.products') }}
+        </Button>
+        <Button :variant="activeLayer === 'system' ? 'default' : 'outline'" size="sm" @click="activeLayer = 'system'">
+          {{ t('admin.nav.system') }}
         </Button>
       </div>
       <p class="text-sm text-muted-foreground">{{ t('admin.navHint') }}</p>
@@ -142,7 +136,7 @@
       </Card>
     </div>
 
-    <div v-else class="grid gap-6 lg:grid-cols-2">
+    <div v-else-if="activeLayer === 'products'" class="grid gap-6 lg:grid-cols-2">
       <Card class="space-y-6 lg:col-span-2">
         <div>
           <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('admin.nav.products') }}</p>
@@ -174,6 +168,28 @@
         </div>
       </Card>
     </div>
+
+    <div v-else class="grid gap-6 lg:grid-cols-2">
+      <Card class="space-y-6">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('admin.nav.system') }}</p>
+          <h2 class="text-2xl font-semibold">{{ t('admin.language') }}</h2>
+        </div>
+        <Select v-model="locale">
+          <option value="de">Deutsch</option>
+          <option value="en">English</option>
+          <option value="fr">Francais</option>
+          <option value="es">Espanol</option>
+        </Select>
+      </Card>
+      <Card class="space-y-6">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('admin.nav.system') }}</p>
+          <h2 class="text-2xl font-semibold">{{ t('admin.theme') }}</h2>
+        </div>
+        <ThemeToggle />
+      </Card>
+    </div>
   </div>
 </template>
 
@@ -187,6 +203,7 @@ import Badge from '@/components/ui/Badge.vue'
 import { useShoppingStore, type StoreConfig, type Category } from '@/stores/shopping'
 import { TrashIcon } from '@radix-icons/vue'
 import { useI18n } from '@/composables/useI18n'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const store = useShoppingStore()
 const { t, locale } = useI18n()
@@ -196,7 +213,7 @@ const newUnit = ref('')
 const productSearch = ref('')
 const draggedId = ref<string | null>(null)
 const unitEdits = ref<Record<string, string>>({})
-const activeLayer = ref<'stores' | 'units' | 'products'>('stores')
+const activeLayer = ref<'stores' | 'units' | 'products' | 'system'>('stores')
 
 onMounted(() => {
   store.units.forEach((unit) => {

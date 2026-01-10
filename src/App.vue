@@ -20,7 +20,6 @@
               {{ isSyncing ? t('sync.syncing') : t('sync.now') }}
             </Button>
           </div>
-          <ThemeToggle />
         </div>
       </div>
     </header>
@@ -32,7 +31,6 @@
 </template>
 
 <script setup lang="ts">
-import ThemeToggle from '@/components/ThemeToggle.vue'
 import Button from '@/components/ui/Button.vue'
 import { useSync } from '@/composables/useSync'
 import { useI18n } from '@/composables/useI18n'
