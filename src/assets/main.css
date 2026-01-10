@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 8% 46%;
+  --popover: 0 0% 100%;
+  --card: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --primary: 237 76% 60%;
+  --secondary: 161 84% 45%;
+  --accent: 38 92% 50%;
+  --destructive: 0 85% 60%;
+  --ring: 237 76% 60%;
+  --radius: 0.9rem;
+}
+
+.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 96%;
+  --muted: 215 27% 15%;
+  --muted-foreground: 215 20% 65%;
+  --popover: 222 47% 10%;
+  --card: 222 47% 10%;
+  --border: 215 27% 20%;
+  --input: 215 27% 20%;
+  --primary: 237 76% 66%;
+  --secondary: 161 72% 52%;
+  --accent: 38 92% 60%;
+  --destructive: 0 75% 60%;
+  --ring: 237 76% 66%;
+  --radius: 0.9rem;
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply font-sans antialiased;
+}
+
+.gradient-surface {
+  @apply bg-hero-gradient dark:bg-hero-gradient-dark;
+}
+
+.card-surface {
+  @apply rounded-2xl border bg-card shadow-xl shadow-black/5 dark:shadow-black/30;
+}
+
+.glow-ring {
+  @apply ring-2 ring-ring ring-offset-2 ring-offset-background;
+}
