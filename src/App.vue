@@ -16,9 +16,6 @@
               {{ isOnline ? t('sync.online') : t('sync.offline') }}
             </span>
             <span class="text-muted-foreground">{{ t('sync.queue', { count: queueCount }) }}</span>
-            <span class="text-muted-foreground">
-              {{ hasApiKey ? t('sync.apiKeySet') : t('sync.apiKeyMissing') }}
-            </span>
             <Button size="sm" variant="outline" :disabled="isSyncing || !isOnline" @click="syncNow">
               {{ isSyncing ? t('sync.syncing') : t('sync.now') }}
             </Button>
