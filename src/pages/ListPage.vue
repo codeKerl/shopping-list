@@ -319,12 +319,13 @@ const formatDate = (value: string) => {
 const selectProduct = (productId: string) => {
   const product = store.productById(productId)
   if (!product) return
-  selectedProductId.value = productId
-  const parsed = parseProductName(product.name)
-  productName.value = parsed.name
-  productAmount.value = parsed.amount
-  selectedUnitId.value = parsed.unitId
-  selectedCategoryId.value = product.categoryId || ''
+  if (!activeList.value) return
+  store.addItemToList(activeList.value.id, product.id)
+  productName.value = ''
+  productAmount.value = ''
+  selectedUnitId.value = ''
+  selectedCategoryId.value = ''
+  selectedProductId.value = ''
 }
 
 const addItem = () => {
