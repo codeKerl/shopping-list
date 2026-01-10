@@ -16,6 +16,9 @@
               {{ isOnline ? t('sync.online') : t('sync.offline') }}
             </span>
             <span class="text-muted-foreground">{{ t('sync.queue', { count: queueCount }) }}</span>
+            <span class="text-muted-foreground">
+              {{ hasApiKey ? t('sync.apiKeySet') : t('sync.apiKeyMissing') }}
+            </span>
             <Button size="sm" variant="outline" :disabled="isSyncing || !isOnline" @click="syncNow">
               {{ isSyncing ? t('sync.syncing') : t('sync.now') }}
             </Button>
@@ -37,4 +40,5 @@ import { useI18n } from '@/composables/useI18n'
 
 const { isOnline, isSyncing, queueCount, syncNow } = useSync()
 const { t } = useI18n()
+const hasApiKey = Boolean(import.meta.env.VITE_API_KEY)
 </script>
