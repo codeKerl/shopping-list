@@ -3,9 +3,9 @@
     <Card class="flex flex-col gap-6">
       <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Zettel</p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('list.sheet') }}</p>
           <h2 class="text-2xl font-semibold">
-            {{ activeList ? formatDate(activeList.createdAt) : 'Zettel nicht gefunden' }}
+            {{ activeList ? formatDate(activeList.createdAt) : t('list.notFound') }}
           </h2>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -13,25 +13,25 @@
             class="inline-flex items-center justify-center rounded-full border border-input bg-transparent px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary transition hover:bg-muted"
             to="/"
           >
-            Zur Uebersicht
+            {{ t('list.backOverview') }}
           </RouterLink>
           <Button :variant="mode === 'plan' ? 'default' : 'outline'" size="sm" @click="mode = 'plan'">
-            Anlegen
+            {{ t('list.mode.plan') }}
           </Button>
           <Button :variant="mode === 'shop' ? 'default' : 'outline'" size="sm" @click="mode = 'shop'">
-            Einkaufen
+            {{ t('list.mode.shop') }}
           </Button>
         </div>
       </div>
       <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div class="space-y-1">
-          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aktueller Zettel</p>
-          <p class="text-sm text-muted-foreground">Wechsel zwischen Anlegen und Einkaufen.</p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('list.current') }}</p>
+          <p class="text-sm text-muted-foreground">{{ t('list.modeHint') }}</p>
         </div>
         <div class="w-full max-w-xs space-y-2">
-          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supermarkt</p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('list.store') }}</p>
           <Select v-model="selectedStoreId" :disabled="!activeList" @update:modelValue="setStore">
-            <option value="">Kein Markt</option>
+            <option value="">{{ t('list.storeNone') }}</option>
             <option v-for="storeItem in store.stores" :key="storeItem.id" :value="storeItem.id">
               {{ storeItem.name }}
             </option>
@@ -44,10 +44,10 @@
         <Card class="space-y-6">
           <form class="grid gap-4 md:grid-cols-[1.4fr_0.6fr_0.6fr_0.8fr_auto]" @submit.prevent="addItem">
             <div class="space-y-2">
-              <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lebensmittel</label>
-              <Input v-model="productName" placeholder="z.B. kleine Tomaten" @focus="selectedProductId = ''" />
+              <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('list.food') }}</label>
+              <Input v-model="productName" :placeholder="t('list.foodPlaceholder')" @focus="selectedProductId = ''" />
               <div v-if="productName" class="rounded-xl border border-input bg-card p-2 text-sm">
-                <p class="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vorschlaege</p>
+                <p class="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('list.suggestions') }}</p>
                 <div class="max-h-40 space-y-1 overflow-auto">
                   <button
                     v-for="product in filteredProducts"
@@ -58,33 +58,33 @@
                     <div class="flex items-center justify-between">
                       <span class="text-sm font-medium">{{ product.name }}</span>
                       <span class="text-xs text-muted-foreground">
-                        {{ categoryName(product.categoryId) || 'Ohne Kategorie' }}
+                        {{ categoryName(product.categoryId) || t('list.categoryNone') }}
                       </span>
                     </div>
                   </button>
                   <div v-if="filteredProducts.length === 0" class="px-3 py-2 text-xs text-muted-foreground">
-                    Keine Treffer - neuer Eintrag wird angelegt.
+                    {{ t('list.noHits') }}
                   </div>
                 </div>
               </div>
             </div>
             <div class="space-y-2">
-              <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Menge</label>
-              <Input v-model="productAmount" placeholder="z.B. 500" />
+              <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('list.amount') }}</label>
+              <Input v-model="productAmount" :placeholder="t('list.amountPlaceholder')" />
             </div>
             <div class="space-y-2">
-              <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Einheit</label>
+              <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('list.unit') }}</label>
               <Select v-model="selectedUnitId">
-                <option value="">Ohne</option>
+                <option value="">{{ t('list.unitNone') }}</option>
                 <option v-for="unit in store.units" :key="unit.id" :value="unit.id">
                   {{ unit.name }}
                 </option>
               </Select>
             </div>
             <div class="space-y-2">
-              <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Kategorie</label>
+              <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('list.category') }}</label>
               <Select v-model="selectedCategoryId">
-                <option value="">Ohne Kategorie</option>
+                <option value="">{{ t('list.categoryNone') }}</option>
                 <option v-for="category in store.categories" :key="category.id" :value="category.id">
                   {{ category.name }}
                 </option>
@@ -101,7 +101,7 @@
               </div>
             </div>
             <div class="flex items-end">
-              <Button class="w-full" type="submit" :disabled="!activeList">Hinzufuegen</Button>
+              <Button class="w-full" type="submit" :disabled="!activeList">{{ t('list.add') }}</Button>
             </div>
           </form>
         </Card>
@@ -110,10 +110,10 @@
           <Card v-for="group in groupedItems" :key="group.id" class="space-y-4">
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Kategorie</p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('list.categoryLabel') }}</p>
                 <h3 class="text-xl font-semibold">{{ group.name }}</h3>
               </div>
-              <Badge class="bg-accent/20 text-accent">{{ group.items.length }} Artikel</Badge>
+              <Badge class="bg-accent/20 text-accent">{{ t('home.items', { count: group.items.length }) }}</Badge>
             </div>
             <div class="space-y-2">
             <div
@@ -137,7 +137,7 @@
                 <button
                   class="rounded-full border border-input bg-card/80 p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                   type="button"
-                  aria-label="Menge reduzieren"
+                  :aria-label="t('list.reduceQty')"
                   @click="updateQuantity(item.id, item.quantity - 1)"
                 >
                   <MinusIcon class="h-4 w-4" />
@@ -146,12 +146,14 @@
                 <button
                   class="rounded-full border border-input bg-card/80 p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                   type="button"
-                  aria-label="Menge erhoehen"
+                  :aria-label="t('list.increaseQty')"
                   @click="updateQuantity(item.id, item.quantity + 1)"
                 >
                   <PlusIcon class="h-4 w-4" />
                 </button>
-                <Button size="sm" variant="ghost" class="text-muted-foreground" @click="removeItem(item.id)">Entfernen</Button>
+                <Button size="sm" variant="ghost" class="text-muted-foreground" @click="removeItem(item.id)">
+                  {{ t('list.remove') }}
+                </Button>
               </div>
             </div>
             </div>
@@ -159,7 +161,7 @@
         </div>
 
         <Card v-else class="text-sm text-muted-foreground">
-          Lege zuerst einen Einkaufszettel an, um Artikel hinzuzufuegen.
+          {{ t('list.empty') }}
         </Card>
     </div>
 
@@ -167,15 +169,15 @@
       <Card v-if="activeList" class="space-y-6">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Einkaufen</p>
-            <h3 class="text-xl font-semibold">Abhakliste</h3>
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('list.mode.shop') }}</p>
+            <h3 class="text-xl font-semibold">{{ t('list.shopTitle') }}</h3>
           </div>
-          <Badge class="bg-secondary/20 text-secondary">Nur Abhaken</Badge>
+          <Badge class="bg-secondary/20 text-secondary">{{ t('list.shopHint') }}</Badge>
         </div>
         <div v-for="group in groupedItems" :key="group.id" class="space-y-3">
           <div class="flex items-center justify-between">
             <h4 class="text-lg font-semibold">{{ group.name }}</h4>
-            <Badge class="bg-accent/20 text-accent">{{ group.items.length }} Artikel</Badge>
+            <Badge class="bg-accent/20 text-accent">{{ t('home.items', { count: group.items.length }) }}</Badge>
           </div>
           <div class="space-y-2">
             <div
@@ -200,7 +202,7 @@
         </div>
       </Card>
       <Card v-else class="text-sm text-muted-foreground">
-        Lege zuerst einen Einkaufszettel an, um Artikel hinzuzufuegen.
+        {{ t('list.empty') }}
       </Card>
     </div>
   </div>
@@ -216,9 +218,11 @@ import Select from '@/components/ui/Select.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { useShoppingStore } from '@/stores/shopping'
 import { MinusIcon, PlusIcon } from '@radix-icons/vue'
+import { useI18n } from '@/composables/useI18n'
 
 const store = useShoppingStore()
 const route = useRoute()
+const { t, locale } = useI18n()
 const productName = ref('')
 const productAmount = ref('')
 const selectedCategoryId = ref('')
@@ -305,7 +309,7 @@ const parseProductName = (value: string) => {
 
 const formatDate = (value: string) => {
   const date = new Date(value)
-  return new Intl.DateTimeFormat('de-DE', {
+  return new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'de-DE', {
     dateStyle: 'medium',
     timeStyle: 'short'
   }).format(date)
@@ -374,7 +378,7 @@ const groupedItems = computed(() => {
     const product = store.productById(item.productId)
     return {
       id: item.id,
-      name: product?.name || 'Unbekannt',
+      name: product?.name || t('list.unknown'),
       categoryId: product?.categoryId,
       checked: item.checked,
       quantity: item.quantity ?? 1
@@ -393,7 +397,7 @@ const groupedItems = computed(() => {
 
   items.forEach((item) => {
     const key = item.categoryId || 'uncat'
-    const name = item.categoryId ? categoryName(item.categoryId) : 'Unkategorisiert'
+    const name = item.categoryId ? categoryName(item.categoryId) : t('list.uncategorized')
     if (!groups.has(key)) {
       groups.set(key, { id: key, name, items: [] })
     }

@@ -50,6 +50,7 @@ export interface ShoppingState {
   activeListId?: string
   revision?: string
   syncQueueCount: number
+  locale: 'de' | 'en'
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
@@ -72,7 +73,8 @@ const loadState = (): ShoppingState => {
       lists: [],
       activeListId: undefined,
       revision: undefined,
-      syncQueueCount: loadQueue().length
+      syncQueueCount: loadQueue().length,
+      locale: 'de'
     }
   }
   try {
@@ -80,7 +82,8 @@ const loadState = (): ShoppingState => {
     return {
       ...parsed,
       units: parsed.units || [],
-      syncQueueCount: loadQueue().length
+      syncQueueCount: loadQueue().length,
+      locale: parsed.locale || 'de'
     }
   } catch {
     return {
@@ -91,7 +94,8 @@ const loadState = (): ShoppingState => {
       lists: [],
       activeListId: undefined,
       revision: undefined,
-      syncQueueCount: loadQueue().length
+      syncQueueCount: loadQueue().length,
+      locale: 'de'
     }
   }
 }
@@ -147,9 +151,15 @@ export const useShoppingStore = defineStore('shopping', {
       this.$state = {
         ...state,
         units: state.units || [],
+        locale: state.locale || 'de',
         syncQueueCount: loadQueue().length
       }
       this.persist()
+    },
+    setLocale(locale: 'de' | 'en') {
+      this.locale = locale
+      this.persist()
+      this.enqueueEvent('settings:locale', { locale })
     },
     setRevision(revision?: string) {
       this.revision = revision

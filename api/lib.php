@@ -34,7 +34,8 @@ function emptyState(): array
         'stores' => [],
         'lists' => [],
         'activeListId' => null,
-        'revision' => null
+        'revision' => null,
+        'locale' => 'de'
     ];
 }
 

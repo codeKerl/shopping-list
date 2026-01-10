@@ -21,6 +21,7 @@ $state['units'] = $state['units'] ?? [];
 $state['products'] = $state['products'] ?? [];
 $state['stores'] = $state['stores'] ?? [];
 $state['lists'] = $state['lists'] ?? [];
+$state['locale'] = $state['locale'] ?? 'de';
 
 $productsByName = [];
 $productsById = [];
@@ -337,6 +338,10 @@ foreach ($events as $event) {
                 }
             }
             $updateList($list);
+            break;
+        case 'settings:locale':
+            $locale = isset($payload['locale']) ? (string)$payload['locale'] : 'de';
+            $state['locale'] = $locale === 'en' ? 'en' : 'de';
             break;
         case 'list:remove':
             $listId = isset($payload['listId']) ? (string)$payload['listId'] : '';

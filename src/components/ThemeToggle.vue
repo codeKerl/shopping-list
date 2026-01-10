@@ -15,12 +15,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
+import { useI18n } from '@/composables/useI18n'
 
 const { mode, setMode } = useTheme()
+const { t } = useI18n()
 
 const options = computed(() => [
-  { value: 'system' as ThemeMode, label: 'System' },
-  { value: 'light' as ThemeMode, label: 'Hell' },
-  { value: 'dark' as ThemeMode, label: 'Dunkel' }
+  { value: 'system' as ThemeMode, label: t('theme.system') },
+  { value: 'light' as ThemeMode, label: t('theme.light') },
+  { value: 'dark' as ThemeMode, label: t('theme.dark') }
 ])
 </script>
