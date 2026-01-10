@@ -9,6 +9,11 @@ export interface Category {
   name: string
 }
 
+export interface Unit {
+  id: string
+  name: string
+}
+
 export interface Product {
   id: string
   name: string
@@ -25,6 +30,7 @@ export interface ListItem {
   id: string
   productId: string
   checked: boolean
+  quantity: number
   note?: string
 }
 
@@ -37,6 +43,7 @@ export interface ShoppingList {
 
 export interface ShoppingState {
   categories: Category[]
+  units: Unit[]
   products: Product[]
   stores: StoreConfig[]
   lists: ShoppingList[]
@@ -59,6 +66,7 @@ const loadState = (): ShoppingState => {
   if (!raw) {
     return {
       categories: [],
+      units: [],
       products: [],
       stores: [],
       lists: [],
@@ -71,11 +79,13 @@ const loadState = (): ShoppingState => {
     const parsed = JSON.parse(raw) as ShoppingState
     return {
       ...parsed,
+      units: parsed.units || [],
       syncQueueCount: loadQueue().length
     }
   } catch {
     return {
       categories: [],
+      units: [],
       products: [],
       stores: [],
       lists: [],
@@ -136,6 +146,7 @@ export const useShoppingStore = defineStore('shopping', {
     replaceState(state: ShoppingState) {
       this.$state = {
         ...state,
+        units: state.units || [],
         syncQueueCount: loadQueue().length
       }
       this.persist()
@@ -177,6 +188,25 @@ export const useShoppingStore = defineStore('shopping', {
       this.enqueueEvent('category:create', { category })
       return category
     },
+    addUnit(name: string) {
+      const unit: Unit = { id: uid(), name }
+      this.units.push(unit)
+      this.persist()
+      this.enqueueEvent('unit:create', { unit })
+      return unit
+    },
+    updateUnit(unitId: string, name: string) {
+      const unit = this.units.find((item) => item.id === unitId)
+      if (!unit) return
+      unit.name = name
+      this.persist()
+      this.enqueueEvent('unit:update', { unitId, name })
+    },
+    removeUnit(unitId: string) {
+      this.units = this.units.filter((unit) => unit.id !== unitId)
+      this.persist()
+      this.enqueueEvent('unit:remove', { unitId })
+    },
     addStore(name: string) {
       const store: StoreConfig = { id: uid(), name, categoryOrder: [] }
       this.stores.push(store)
@@ -209,7 +239,7 @@ export const useShoppingStore = defineStore('shopping', {
       const list = this.lists.find((item) => item.id === listId)
       if (!list) return
       const product = this.products.find((item) => item.id === productId)
-      const listItem = { id: uid(), productId, checked: false, note }
+      const listItem = { id: uid(), productId, checked: false, quantity: 1, note }
       list.items.push(listItem)
       this.persist()
       this.enqueueEvent('list:item:add', { listId, item: listItem, productName: product?.name || '' })
@@ -237,6 +267,16 @@ export const useShoppingStore = defineStore('shopping', {
       this.persist()
       this.enqueueEvent('list:item:remove', { listId, itemId })
     },
+    updateItemQuantity(listId: string, itemId: string, quantity: number) {
+      const list = this.lists.find((item) => item.id === listId)
+      if (!list) return
+      const item = list.items.find((entry) => entry.id === itemId)
+      if (!item) return
+      const safeQuantity = Math.max(1, Math.floor(quantity))
+      item.quantity = safeQuantity
+      this.persist()
+      this.enqueueEvent('list:item:quantity', { listId, itemId, quantity: safeQuantity })
+    },
     removeList(listId: string) {
       this.lists = this.lists.filter((list) => list.id !== listId)
       if (this.activeListId === listId) {
@@ -244,6 +284,15 @@ export const useShoppingStore = defineStore('shopping', {
       }
       this.persist()
       this.enqueueEvent('list:remove', { listId })
+    },
+    removeProduct(productId: string) {
+      this.products = this.products.filter((product) => product.id !== productId)
+      this.lists = this.lists.map((list) => ({
+        ...list,
+        items: list.items.filter((item) => item.productId !== productId)
+      }))
+      this.persist()
+      this.enqueueEvent('product:remove', { productId })
     }
   }
 })

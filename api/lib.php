@@ -29,6 +29,7 @@ function emptyState(): array
 {
     return [
         'categories' => [],
+        'units' => [],
         'products' => [],
         'stores' => [],
         'lists' => [],

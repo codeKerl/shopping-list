@@ -17,6 +17,7 @@ $state = $stateData['state'];
 $revision = $stateData['revision'];
 
 $state['categories'] = $state['categories'] ?? [];
+$state['units'] = $state['units'] ?? [];
 $state['products'] = $state['products'] ?? [];
 $state['stores'] = $state['stores'] ?? [];
 $state['lists'] = $state['lists'] ?? [];
@@ -33,10 +34,18 @@ foreach ($state['products'] as $product) {
 
 $categoriesById = [];
 foreach ($state['categories'] as $category) {
-    if (!isset($category['id'])) {
+  if (!isset($category['id'])) {
+    continue;
+  }
+  $categoriesById[(string)$category['id']] = $category;
+}
+
+$unitsById = [];
+foreach ($state['units'] as $unit) {
+    if (!isset($unit['id'])) {
         continue;
     }
-    $categoriesById[(string)$category['id']] = $category;
+    $unitsById[(string)$unit['id']] = $unit;
 }
 
 $listsById = [];
@@ -119,6 +128,39 @@ foreach ($events as $event) {
                 $categoriesById[$id] = $category;
             }
             break;
+        case 'unit:create':
+            $unit = $payload['unit'] ?? null;
+            if (!is_array($unit) || !isset($unit['id'], $unit['name'])) {
+                break;
+            }
+            $id = (string)$unit['id'];
+            if (!isset($unitsById[$id])) {
+                $state['units'][] = $unit;
+                $unitsById[$id] = $unit;
+            }
+            break;
+        case 'unit:update':
+            $unitId = isset($payload['unitId']) ? (string)$payload['unitId'] : '';
+            $name = isset($payload['name']) ? (string)$payload['name'] : '';
+            if ($unitId === '' || $name === '') {
+                break;
+            }
+            foreach ($state['units'] as $index => $unit) {
+                if ((string)$unit['id'] === $unitId) {
+                    $state['units'][$index]['name'] = $name;
+                    break;
+                }
+            }
+            break;
+        case 'unit:remove':
+            $unitId = isset($payload['unitId']) ? (string)$payload['unitId'] : '';
+            if ($unitId === '') {
+                break;
+            }
+            $state['units'] = array_values(array_filter($state['units'], function ($unit) use ($unitId) {
+                return (string)$unit['id'] !== $unitId;
+            }));
+            break;
         case 'store:create':
             $store = $payload['store'] ?? null;
             if (!is_array($store) || !isset($store['id'], $store['name'])) {
@@ -182,6 +224,22 @@ foreach ($events as $event) {
                 }
             }
             break;
+        case 'product:remove':
+            $productId = isset($payload['productId']) ? (string)$payload['productId'] : null;
+            if ($productId === null) {
+                break;
+            }
+            $mappedId = $mapProductId($productId);
+            $state['products'] = array_values(array_filter($state['products'], function ($product) use ($mappedId) {
+                return (string)$product['id'] !== $mappedId;
+            }));
+            foreach ($listsById as $listId => $list) {
+                $list['items'] = array_values(array_filter($list['items'], function ($item) use ($mappedId) {
+                    return (string)$item['productId'] !== $mappedId;
+                }));
+                $listsById[$listId] = $list;
+            }
+            break;
         case 'list:create':
             $list = $payload['list'] ?? null;
             if (!is_array($list) || !isset($list['id'])) {
@@ -231,6 +289,7 @@ foreach ($events as $event) {
             if (!$exists) {
                 $item['productId'] = $productId;
                 $item['checked'] = (bool)($item['checked'] ?? false);
+                $item['quantity'] = isset($item['quantity']) ? max(1, (int)$item['quantity']) : 1;
                 $list['items'][] = $item;
             }
             $updateList($list);
@@ -261,6 +320,22 @@ foreach ($events as $event) {
             $list['items'] = array_values(array_filter($list['items'], function ($listItem) use ($itemId) {
                 return (string)$listItem['id'] !== $itemId;
             }));
+            $updateList($list);
+            break;
+        case 'list:item:quantity':
+            $listId = isset($payload['listId']) ? (string)$payload['listId'] : '';
+            $itemId = isset($payload['itemId']) ? (string)$payload['itemId'] : '';
+            $quantity = isset($payload['quantity']) ? (int)$payload['quantity'] : 1;
+            if ($listId === '' || $itemId === '') {
+                break;
+            }
+            $list = $ensureList($listId);
+            foreach ($list['items'] as $index => $listItem) {
+                if ((string)$listItem['id'] === $itemId) {
+                    $list['items'][$index]['quantity'] = max(1, $quantity);
+                    break;
+                }
+            }
             $updateList($list);
             break;
         case 'list:remove':

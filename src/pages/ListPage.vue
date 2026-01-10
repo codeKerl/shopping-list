@@ -42,11 +42,11 @@
 
     <div class="space-y-6" v-if="mode === 'plan'">
         <Card class="space-y-6">
-          <form class="grid gap-4 md:grid-cols-[1.4fr_0.8fr_auto]" @submit.prevent="addItem">
+          <form class="grid gap-4 md:grid-cols-[1.4fr_0.6fr_0.6fr_0.8fr_auto]" @submit.prevent="addItem">
             <div class="space-y-2">
               <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lebensmittel</label>
-              <Input v-model="searchTerm" placeholder="z.B. kleine Tomaten (500g)" @focus="selectedProductId = ''" />
-              <div v-if="searchTerm" class="rounded-xl border border-input bg-card p-2 text-sm">
+              <Input v-model="productName" placeholder="z.B. kleine Tomaten" @focus="selectedProductId = ''" />
+              <div v-if="productName" class="rounded-xl border border-input bg-card p-2 text-sm">
                 <p class="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vorschlaege</p>
                 <div class="max-h-40 space-y-1 overflow-auto">
                   <button
@@ -67,6 +67,19 @@
                   </div>
                 </div>
               </div>
+            </div>
+            <div class="space-y-2">
+              <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Menge</label>
+              <Input v-model="productAmount" placeholder="z.B. 500" />
+            </div>
+            <div class="space-y-2">
+              <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Einheit</label>
+              <Select v-model="selectedUnitId">
+                <option value="">Ohne</option>
+                <option v-for="unit in store.units" :key="unit.id" :value="unit.id">
+                  {{ unit.name }}
+                </option>
+              </Select>
             </div>
             <div class="space-y-2">
               <label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Kategorie</label>
@@ -103,25 +116,44 @@
               <Badge class="bg-accent/20 text-accent">{{ group.items.length }} Artikel</Badge>
             </div>
             <div class="space-y-2">
-              <div
-                v-for="item in group.items"
-                :key="item.id"
-                class="flex items-center justify-between rounded-xl border border-input p-3 transition"
-                :class="item.checked ? 'bg-muted/50 text-muted-foreground' : 'bg-card'"
-              >
-                <button class="flex items-center gap-3 text-left" @click="toggleItem(item.id)">
-                  <span
-                    class="flex h-5 w-5 items-center justify-center rounded-full border"
-                    :class="item.checked ? 'border-primary bg-primary text-primary-foreground' : 'border-input'"
-                  >
-                    <span v-if="item.checked" class="text-xs">x</span>
-                  </span>
-                  <span :class="item.checked ? 'line-through' : ''">
-                    {{ item.name }}
-                  </span>
+            <div
+              v-for="item in group.items"
+              :key="item.id"
+              class="flex items-center justify-between rounded-xl border border-input p-3 transition"
+              :class="item.checked ? 'bg-muted/50 text-muted-foreground' : 'bg-card'"
+            >
+              <button class="flex items-center gap-3 text-left" @click="toggleItem(item.id)">
+                <span
+                  class="flex h-5 w-5 items-center justify-center rounded-full border"
+                  :class="item.checked ? 'border-primary bg-primary text-primary-foreground' : 'border-input'"
+                >
+                  <span v-if="item.checked" class="text-xs">x</span>
+                </span>
+                <span :class="item.checked ? 'line-through' : ''">
+                  {{ formatItemName(item) }}
+                </span>
+              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  class="rounded-full border border-input bg-card/80 p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  type="button"
+                  aria-label="Menge reduzieren"
+                  @click="updateQuantity(item.id, item.quantity - 1)"
+                >
+                  <MinusIcon class="h-4 w-4" />
+                </button>
+                <span class="text-xs font-semibold">{{ item.quantity }}x</span>
+                <button
+                  class="rounded-full border border-input bg-card/80 p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  type="button"
+                  aria-label="Menge erhoehen"
+                  @click="updateQuantity(item.id, item.quantity + 1)"
+                >
+                  <PlusIcon class="h-4 w-4" />
                 </button>
                 <Button size="sm" variant="ghost" class="text-muted-foreground" @click="removeItem(item.id)">Entfernen</Button>
               </div>
+            </div>
             </div>
           </Card>
         </div>
@@ -160,7 +192,7 @@
                   <span v-if="item.checked" class="text-xs">x</span>
                 </span>
                 <span :class="item.checked ? 'line-through' : ''">
-                  {{ item.name }}
+                  {{ formatItemName(item) }}
                 </span>
               </button>
             </div>
@@ -183,13 +215,16 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { useShoppingStore } from '@/stores/shopping'
+import { MinusIcon, PlusIcon } from '@radix-icons/vue'
 
 const store = useShoppingStore()
 const route = useRoute()
-const searchTerm = ref('')
+const productName = ref('')
+const productAmount = ref('')
 const selectedCategoryId = ref('')
 const selectedProductId = ref('')
 const selectedStoreId = ref('')
+const selectedUnitId = ref('')
 const mode = ref<'plan' | 'shop'>('plan')
 
 const routeListId = computed(() => route.params.id as string | undefined)
@@ -224,13 +259,48 @@ watch(
 
 
 const filteredProducts = computed(() => {
-  const term = searchTerm.value.trim().toLowerCase()
+  const term = productName.value.trim().toLowerCase()
   if (!term) return []
   return store.products.filter((product) => product.name.toLowerCase().includes(term))
 })
 
 const categoryName = (id?: string) => {
   return store.categoryById(id)?.name || ''
+}
+
+const unitNameById = (id?: string) => {
+  return store.units.find((unit) => unit.id === id)?.name || ''
+}
+
+const buildProductName = () => {
+  const base = productName.value.trim()
+  if (!base) return ''
+  const amount = productAmount.value.trim()
+  const unitName = unitNameById(selectedUnitId.value)
+  if (amount && unitName) {
+    return `${base} (${amount}${unitName})`
+  }
+  if (amount) {
+    return `${base} (${amount})`
+  }
+  return base
+}
+
+const parseProductName = (value: string) => {
+  const match = value.match(/^(.*?)\s*\(([^)]+)\)\s*$/)
+  if (!match) {
+    return { name: value, amount: '', unitId: '' }
+  }
+  const name = match[1].trim()
+  const amountUnit = match[2].trim()
+  const amountMatch = amountUnit.match(/^([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Zµ]+)?$/)
+  if (!amountMatch) {
+    return { name, amount: amountUnit, unitId: '' }
+  }
+  const amount = amountMatch[1].replace(',', '.')
+  const unitName = amountMatch[2] || ''
+  const unit = store.units.find((item) => item.name.toLowerCase() === unitName.toLowerCase())
+  return { name, amount, unitId: unit?.id || '' }
 }
 
 const formatDate = (value: string) => {
@@ -246,13 +316,16 @@ const selectProduct = (productId: string) => {
   const product = store.productById(productId)
   if (!product) return
   selectedProductId.value = productId
-  searchTerm.value = product.name
+  const parsed = parseProductName(product.name)
+  productName.value = parsed.name
+  productAmount.value = parsed.amount
+  selectedUnitId.value = parsed.unitId
   selectedCategoryId.value = product.categoryId || ''
 }
 
 const addItem = () => {
   if (!activeList.value) return
-  const name = searchTerm.value.trim()
+  const name = buildProductName()
   if (!name) return
 
   let productId = selectedProductId.value
@@ -272,7 +345,9 @@ const addItem = () => {
   }
 
   store.addItemToList(activeList.value.id, productId)
-  searchTerm.value = ''
+  productName.value = ''
+  productAmount.value = ''
+  selectedUnitId.value = ''
   selectedCategoryId.value = ''
   selectedProductId.value = ''
 }
@@ -301,7 +376,8 @@ const groupedItems = computed(() => {
       id: item.id,
       name: product?.name || 'Unbekannt',
       categoryId: product?.categoryId,
-      checked: item.checked
+      checked: item.checked,
+      quantity: item.quantity ?? 1
     }
   })
 
@@ -337,4 +413,13 @@ const groupedItems = computed(() => {
     items: [...group.items].sort((a, b) => Number(a.checked) - Number(b.checked))
   }))
 })
+
+const formatItemName = (item: { name: string; quantity: number }) => {
+  return item.quantity > 1 ? `${item.quantity}x ${item.name}` : item.name
+}
+
+const updateQuantity = (itemId: string, quantity: number) => {
+  if (!activeList.value) return
+  store.updateItemQuantity(activeList.value.id, itemId, quantity)
+}
 </script>
