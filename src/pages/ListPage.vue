@@ -216,37 +216,37 @@ const selectedProductId = ref('')
 const selectedStoreId = ref('')
 const mode = ref<'plan' | 'shop'>('plan')
 
-const setActiveFromRoute = (id?: string) => {
-  if (!id) return
-  const list = store.lists.find((entry) => entry.id === id)
-  if (list) {
-    store.setActiveList(id)
+const routeListId = computed(() => route.params.id as string | undefined)
+const activeList = computed(() => store.lists.find((entry) => entry.id === routeListId.value))
+
+const setActiveFromRoute = () => {
+  if (activeList.value) {
+    store.setActiveList(activeList.value.id)
   }
 }
 
 onMounted(() => {
-  setActiveFromRoute(route.params.id as string | undefined)
-  if (store.activeList?.storeId) {
-    selectedStoreId.value = store.activeList.storeId
+  setActiveFromRoute()
+  if (activeList.value?.storeId) {
+    selectedStoreId.value = activeList.value.storeId
   }
 })
 
 watch(
   () => route.params.id,
-  (value) => {
-    setActiveFromRoute(value as string | undefined)
+  () => {
+    setActiveFromRoute()
   }
 )
 
 watch(
-  () => store.activeList?.storeId,
+  () => activeList.value?.storeId,
   (value) => {
     selectedStoreId.value = value || ''
   }
 )
 
 const lists = computed(() => store.lists)
-const activeList = computed(() => store.activeList)
 
 const filteredProducts = computed(() => {
   const term = searchTerm.value.trim().toLowerCase()

@@ -208,10 +208,11 @@ export const useShoppingStore = defineStore('shopping', {
     addItemToList(listId: string, productId: string, note?: string) {
       const list = this.lists.find((item) => item.id === listId)
       if (!list) return
+      const product = this.products.find((item) => item.id === productId)
       const listItem = { id: uid(), productId, checked: false, note }
       list.items.push(listItem)
       this.persist()
-      this.enqueueEvent('list:item:add', { listId, item: listItem })
+      this.enqueueEvent('list:item:add', { listId, item: listItem, productName: product?.name || '' })
     },
     toggleItem(listId: string, itemId: string) {
       const list = this.lists.find((item) => item.id === listId)
