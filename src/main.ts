@@ -5,6 +5,9 @@ import App from './App.vue'
 import './assets/main.css'
 import { routes } from './router'
 import { registerSW } from 'virtual:pwa-register'
+import { initTheme } from './composables/useTheme'
+
+initTheme()
 
 const app = createApp(App)
 const pinia = createPinia()
