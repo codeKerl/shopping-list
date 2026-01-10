@@ -72,13 +72,25 @@
                 v-for="category in orderedCategories(storeItem)"
                 :key="category.id"
                 class="flex items-center justify-between rounded-xl border border-input bg-muted/40 p-3 text-sm"
+                :data-store-id="storeItem.id"
+                :data-category-id="category.id"
                 draggable="true"
                 @dragstart="onDragStart(category.id)"
                 @dragover.prevent
                 @drop="onDrop(storeItem.id, category.id)"
               >
                 <span class="font-medium">{{ category.name }}</span>
-                <span class="text-xs text-muted-foreground">{{ t('admin.stores.drag') }}</span>
+                <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>{{ t('admin.stores.drag') }}</span>
+                  <button
+                    type="button"
+                    class="rounded-full border border-input bg-card/80 p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    aria-label="Hold to drag"
+                    @pointerdown="onHandlePointerDown($event, storeItem.id, category.id)"
+                  >
+                    <GripHorizontalIcon class="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               <div v-if="store.categories.length === 0" class="rounded-xl border border-dashed border-input p-4 text-xs text-muted-foreground">
                 {{ t('admin.stores.noCategories') }}
@@ -201,7 +213,7 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { useShoppingStore, type StoreConfig, type Category } from '@/stores/shopping'
-import { TrashIcon } from '@radix-icons/vue'
+import { GripHorizontalIcon, TrashIcon } from '@radix-icons/vue'
 import { useI18n } from '@/composables/useI18n'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 
@@ -214,6 +226,8 @@ const productSearch = ref('')
 const draggedId = ref<string | null>(null)
 const unitEdits = ref<Record<string, string>>({})
 const activeLayer = ref<'stores' | 'units' | 'products' | 'system'>('stores')
+const dragTouch = ref<{ storeId: string; categoryId: string } | null>(null)
+let dragHoldTimer: number | null = null
 
 onMounted(() => {
   store.units.forEach((unit) => {
@@ -289,6 +303,58 @@ const onDrop = (storeId: string, targetId: string) => {
   ordered.splice(to, 0, ordered.splice(from, 1)[0])
   store.setStoreOrder(storeId, ordered)
   draggedId.value = null
+}
+
+const onHandlePointerDown = (event: PointerEvent, storeId: string, categoryId: string) => {
+  if (event.pointerType !== 'touch') return
+  event.preventDefault()
+  if (dragHoldTimer) {
+    window.clearTimeout(dragHoldTimer)
+  }
+  const cancelHold = () => {
+    if (dragHoldTimer) {
+      window.clearTimeout(dragHoldTimer)
+      dragHoldTimer = null
+    }
+  }
+  window.addEventListener('pointerup', cancelHold, { once: true })
+  window.addEventListener('pointercancel', cancelHold, { once: true })
+  dragHoldTimer = window.setTimeout(() => {
+    dragHoldTimer = null
+    dragTouch.value = { storeId, categoryId }
+    window.addEventListener('pointermove', onTouchDragMove)
+    window.addEventListener('pointerup', endTouchDrag, { once: true })
+    window.addEventListener('pointercancel', endTouchDrag, { once: true })
+  }, 200)
+}
+
+const onTouchDragMove = (event: PointerEvent) => {
+  if (!dragTouch.value) return
+  const target = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null
+  const row = target?.closest?.('[data-category-id]') as HTMLElement | null
+  if (!row) return
+  const targetId = row.dataset.categoryId
+  const storeId = row.dataset.storeId
+  if (!targetId || !storeId || storeId !== dragTouch.value.storeId) return
+  if (targetId === dragTouch.value.categoryId) return
+  const storeItem = store.stores.find((item) => item.id === storeId)
+  if (!storeItem) return
+  const ordered = orderedCategories(storeItem).map((category) => category.id)
+  const from = ordered.indexOf(dragTouch.value.categoryId)
+  const to = ordered.indexOf(targetId)
+  if (from === -1 || to === -1) return
+  ordered.splice(to, 0, ordered.splice(from, 1)[0])
+  store.setStoreOrder(storeId, ordered)
+  dragTouch.value.categoryId = targetId
+}
+
+const endTouchDrag = () => {
+  if (dragHoldTimer) {
+    window.clearTimeout(dragHoldTimer)
+    dragHoldTimer = null
+  }
+  dragTouch.value = null
+  window.removeEventListener('pointermove', onTouchDragMove)
 }
 
 const categoryName = (id?: string) => {
