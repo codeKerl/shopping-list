@@ -236,6 +236,14 @@ export const useShoppingStore = defineStore('shopping', {
       list.items = list.items.filter((entry) => entry.id !== itemId)
       this.persist()
       this.enqueueEvent('list:item:remove', { listId, itemId })
+    },
+    removeList(listId: string) {
+      this.lists = this.lists.filter((list) => list.id !== listId)
+      if (this.activeListId === listId) {
+        this.activeListId = this.lists[0]?.id
+      }
+      this.persist()
+      this.enqueueEvent('list:remove', { listId })
     }
   }
 })

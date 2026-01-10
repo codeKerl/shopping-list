@@ -9,6 +9,12 @@
           </h2>
         </div>
         <div class="flex flex-wrap gap-2">
+          <RouterLink
+            class="inline-flex items-center justify-center rounded-full border border-input bg-transparent px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary transition hover:bg-muted"
+            to="/"
+          >
+            Zur Uebersicht
+          </RouterLink>
           <Button :variant="mode === 'plan' ? 'default' : 'outline'" size="sm" @click="mode = 'plan'">
             Anlegen
           </Button>
@@ -34,35 +40,7 @@
       </div>
     </Card>
 
-    <div class="grid gap-6 lg:grid-cols-[320px_1fr]" v-if="mode === 'plan'">
-      <Card class="flex h-full flex-col gap-6">
-        <div class="space-y-2">
-          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Archiv</p>
-          <div class="flex items-center justify-between">
-            <h2 class="text-2xl font-semibold">Einkaufszettel</h2>
-            <RouterLink class="text-xs font-semibold uppercase tracking-wide text-primary" to="/">Zur Uebersicht</RouterLink>
-          </div>
-        </div>
-        <div class="space-y-3">
-          <button
-            v-for="list in lists"
-            :key="list.id"
-            class="w-full rounded-xl border border-input p-3 text-left transition hover:bg-muted"
-            :class="list.id === activeList?.id ? 'bg-muted/70' : 'bg-transparent'"
-            @click="goToList(list.id)"
-          >
-            <p class="text-sm font-semibold">{{ formatDate(list.createdAt) }}</p>
-            <p class="text-xs text-muted-foreground">
-              {{ list.items.length }} Artikel
-            </p>
-          </button>
-          <div v-if="lists.length === 0" class="rounded-xl border border-dashed border-input p-4 text-sm text-muted-foreground">
-            Noch kein Einkaufszettel angelegt.
-          </div>
-        </div>
-      </Card>
-
-      <div class="space-y-6">
+    <div class="space-y-6" v-if="mode === 'plan'">
         <Card class="space-y-6">
           <form class="grid gap-4 md:grid-cols-[1.4fr_0.8fr_auto]" @submit.prevent="addItem">
             <div class="space-y-2">
@@ -151,7 +129,6 @@
         <Card v-else class="text-sm text-muted-foreground">
           Lege zuerst einen Einkaufszettel an, um Artikel hinzuzufuegen.
         </Card>
-      </div>
     </div>
 
     <div v-else class="space-y-6">
@@ -199,7 +176,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import Card from '@/components/ui/Card.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -209,7 +186,6 @@ import { useShoppingStore } from '@/stores/shopping'
 
 const store = useShoppingStore()
 const route = useRoute()
-const router = useRouter()
 const searchTerm = ref('')
 const selectedCategoryId = ref('')
 const selectedProductId = ref('')
@@ -246,7 +222,6 @@ watch(
   }
 )
 
-const lists = computed(() => store.lists)
 
 const filteredProducts = computed(() => {
   const term = searchTerm.value.trim().toLowerCase()
@@ -266,9 +241,6 @@ const formatDate = (value: string) => {
   }).format(date)
 }
 
-const goToList = (id: string) => {
-  router.push({ name: 'list', params: { id } })
-}
 
 const selectProduct = (productId: string) => {
   const product = store.productById(productId)

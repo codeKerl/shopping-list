@@ -9,20 +9,29 @@
         <Button @click="createNewList">Neuen Zettel anlegen</Button>
       </div>
       <div class="grid gap-4 md:grid-cols-2">
-        <RouterLink
+        <div
           v-for="list in lists"
           :key="list.id"
-          :to="{ name: 'list', params: { id: list.id } }"
           class="rounded-2xl border border-input bg-card p-4 transition hover:bg-muted"
         >
-          <div class="flex items-center justify-between">
-            <div>
+          <div class="flex items-start justify-between gap-3">
+            <RouterLink :to="{ name: 'list', params: { id: list.id } }" class="flex-1">
               <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Zettel</p>
               <p class="text-lg font-semibold">{{ formatDate(list.createdAt) }}</p>
+            </RouterLink>
+            <div class="flex items-center gap-2">
+              <Badge class="bg-accent/20 text-accent">{{ list.items.length }} Artikel</Badge>
+              <button
+                class="rounded-full border border-input bg-card/80 p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                type="button"
+                aria-label="Zettel loeschen"
+                @click="removeList(list.id)"
+              >
+                <TrashIcon class="h-4 w-4" />
+              </button>
             </div>
-            <Badge class="bg-accent/20 text-accent">{{ list.items.length }} Artikel</Badge>
           </div>
-        </RouterLink>
+        </div>
         <div v-if="lists.length === 0" class="rounded-xl border border-dashed border-input p-4 text-sm text-muted-foreground">
           Noch kein Einkaufszettel angelegt.
         </div>
@@ -51,6 +60,7 @@ import Card from '@/components/ui/Card.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { useShoppingStore } from '@/stores/shopping'
+import { TrashIcon } from '@radix-icons/vue'
 
 const store = useShoppingStore()
 const router = useRouter()
@@ -68,5 +78,9 @@ const formatDate = (value: string) => {
 const createNewList = () => {
   const list = store.createList()
   router.push({ name: 'list', params: { id: list.id } })
+}
+
+const removeList = (id: string) => {
+  store.removeList(id)
 }
 </script>

@@ -263,6 +263,18 @@ foreach ($events as $event) {
             }));
             $updateList($list);
             break;
+        case 'list:remove':
+            $listId = isset($payload['listId']) ? (string)$payload['listId'] : '';
+            if ($listId === '') {
+                break;
+            }
+            if (isset($listsById[$listId])) {
+                unset($listsById[$listId]);
+            }
+            if (isset($state['activeListId']) && (string)$state['activeListId'] === $listId) {
+                $state['activeListId'] = null;
+            }
+            break;
         default:
             break;
     }
