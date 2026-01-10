@@ -81,14 +81,15 @@
               >
                 <span class="font-medium">{{ category.name }}</span>
                 <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{{ t('admin.stores.drag') }}</span>
+                  <span class="hidden sm:inline">{{ t('admin.stores.drag') }}</span>
                   <button
                     type="button"
-                    class="rounded-full border border-input bg-card/80 p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    class="flex h-8 w-8 items-center justify-center rounded-full border border-input bg-card/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                     aria-label="Hold to drag"
                     @pointerdown="onHandlePointerDown($event, storeItem.id, category.id)"
                   >
                     <GripHorizontalIcon class="h-4 w-4" />
+                    <span class="sr-only">Drag</span>
                   </button>
                 </div>
               </div>
