@@ -45,8 +45,8 @@ A shared, offline-first family shopping list with list archives, product reuse, 
    npm run dev
    ```
 3. (Optional) Configure API auth
-   - Server: set `API_KEY` or `BASIC_AUTH_USER` / `BASIC_AUTH_PASS`
-   - Client: set `VITE_API_KEY` for Bearer auth
+   - Server: set `SHOPPINGLIST_API_KEY` or `BASIC_AUTH_USER` / `BASIC_AUTH_PASS`
+   - Client: set `VITE_API_KEY` for Bearer auth (must match `SHOPPINGLIST_API_KEY`)
 
 ## Deployment
 
@@ -65,6 +65,6 @@ Required GitHub Secrets:
 - `VITE_API_BASE`: optional API base URL if the frontend is configured to use it
 
 Server environment (optional auth):
-- `API_KEY`: Bearer token for `/api/*`
+- `SHOPPINGLIST_API_KEY`: Bearer token for `/api/*` (set via `.htaccess` with `SetEnv` in the `api/` directory)
 - `BASIC_AUTH_USER`: Basic auth username
 - `BASIC_AUTH_PASS`: Basic auth password

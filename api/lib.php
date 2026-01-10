@@ -92,7 +92,7 @@ function jsonResponse(array $payload, int $status = 200): void
 
 function requireAuth(): void
 {
-    $apiKey = getenv('API_KEY');
+    $apiKey = getenv('SHOPPINGLIST_API_KEY');
     $basicUser = getenv('BASIC_AUTH_USER');
     $basicPass = getenv('BASIC_AUTH_PASS');
 
