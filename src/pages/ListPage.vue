@@ -282,7 +282,7 @@ const buildProductName = () => {
   const amount = productAmount.value.trim()
   const unitName = unitNameById(selectedUnitId.value)
   if (amount && unitName) {
-    return `${base} (${amount}${unitName})`
+    return `${base} (${amount} ${unitName})`
   }
   if (amount) {
     return `${base} (${amount})`

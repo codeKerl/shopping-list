@@ -28,12 +28,7 @@ export function useSync() {
   const sendEvents = async () => {
     const queue = store.getQueue()
     if (queue.length === 0) return true
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    }
-    if (import.meta.env.VITE_API_KEY) {
-      headers.Authorization = `Bearer ${import.meta.env.VITE_API_KEY}`
-    }
+    const headers = buildHeaders()
     const response = await fetch(SYNC_ENDPOINT, {
       method: 'POST',
       headers,
@@ -48,7 +43,9 @@ export function useSync() {
   }
 
   const pullState = async () => {
-    const response = await fetch(STATE_ENDPOINT)
+    const response = await fetch(STATE_ENDPOINT, {
+      headers: buildHeaders()
+    })
     if (!response.ok) {
       throw new Error(`State pull failed with ${response.status}`)
     }
@@ -126,4 +123,14 @@ export function useSync() {
     queueCount,
     syncNow
   }
+}
+
+const buildHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  }
+  if (import.meta.env.VITE_API_KEY) {
+    headers.Authorization = `Bearer ${import.meta.env.VITE_API_KEY}`
+  }
+  return headers
 }
