@@ -1,4 +1,4 @@
-# Einkaufszettel
+# Einkaufszettel aka Shoppinglist
 
 A shared, offline-first family shopping list with list archives, product reuse, and store-specific category ordering. The app runs as a PWA, keeps working without a network connection, and synchronizes with a server-side SQLite store when online.
 
