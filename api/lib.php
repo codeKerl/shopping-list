@@ -101,6 +101,18 @@ function requireAuth(): void
     }
 
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if ($authHeader === '') {
+        $authHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    }
+    if ($authHeader === '' && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        foreach ($headers as $key => $value) {
+            if (strtolower((string)$key) === 'authorization') {
+                $authHeader = (string)$value;
+                break;
+            }
+        }
+    }
     if ($apiKey && $authHeader === ('Bearer ' . $apiKey)) {
         return;
     }
@@ -111,6 +123,8 @@ function requireAuth(): void
         return;
     }
 
-    header('WWW-Authenticate: Basic realm=\"Sync\"');
+    if ($basicUser && $basicPass) {
+        header('WWW-Authenticate: Basic realm=\"Sync\"');
+    }
     jsonResponse(['error' => 'unauthorized'], 401);
 }
