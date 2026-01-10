@@ -80,7 +80,7 @@ export function useSync() {
       if (document.visibilityState === 'visible') {
         syncNow()
       }
-    }, 10000)
+    }, 60000)
   }
 
   const stopPolling = () => {

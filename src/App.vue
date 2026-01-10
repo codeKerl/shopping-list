@@ -16,7 +16,7 @@
               {{ isOnline ? t('sync.online') : t('sync.offline') }}
             </span>
             <span class="text-muted-foreground">{{ t('sync.queue', { count: queueCount }) }}</span>
-            <Button size="sm" variant="outline" :disabled="isSyncing || !isOnline" @click="syncNow">
+            <Button size="sm" variant="outline" class="min-w-[88px]" :disabled="isSyncing || !isOnline" @click="syncNow">
               {{ isSyncing ? t('sync.syncing') : t('sync.now') }}
             </Button>
           </div>
