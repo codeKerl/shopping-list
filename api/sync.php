@@ -12,71 +12,67 @@ if (!is_array($events)) {
 }
 
 $pdo = db();
-$stateData = loadState($pdo);
-$state = $stateData['state'];
-$revision = $stateData['revision'];
+$pdo->beginTransaction();
 
-$state['categories'] = $state['categories'] ?? [];
-$state['units'] = $state['units'] ?? [];
-$state['products'] = $state['products'] ?? [];
-$state['stores'] = $state['stores'] ?? [];
-$state['lists'] = $state['lists'] ?? [];
-$state['locale'] = $state['locale'] ?? 'de';
-
-$productsByName = [];
-$productsById = [];
-foreach ($state['products'] as $product) {
-    if (!isset($product['id'], $product['name'])) {
-        continue;
-    }
-    $productsByName[normalizeName((string)$product['name'])] = (string)$product['id'];
-    $productsById[(string)$product['id']] = $product;
-}
+$meta = $pdo->query('SELECT revision, locale, active_list_id FROM app_meta WHERE id = 1')->fetch(PDO::FETCH_ASSOC);
+$revision = (int)($meta['revision'] ?? 0);
+$activeListId = $meta['active_list_id'] ?? null;
 
 $categoriesById = [];
-foreach ($state['categories'] as $category) {
-  if (!isset($category['id'])) {
-    continue;
-  }
-  $categoriesById[(string)$category['id']] = $category;
+foreach ($pdo->query('SELECT id FROM categories')->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $categoriesById[(string)$row['id']] = true;
 }
 
 $unitsById = [];
-foreach ($state['units'] as $unit) {
-    if (!isset($unit['id'])) {
-        continue;
-    }
-    $unitsById[(string)$unit['id']] = $unit;
+foreach ($pdo->query('SELECT id FROM units')->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $unitsById[(string)$row['id']] = true;
+}
+
+$productsByName = [];
+$productsById = [];
+foreach ($pdo->query('SELECT id, name, category_id FROM products')->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $productsById[(string)$row['id']] = $row;
+    $productsByName[normalizeName((string)$row['name'])] = (string)$row['id'];
 }
 
 $listsById = [];
-foreach ($state['lists'] as $list) {
-    if (!isset($list['id'])) {
-        continue;
-    }
-    $listsById[(string)$list['id']] = $list;
+foreach ($pdo->query('SELECT id, created_at, store_id FROM lists')->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $listsById[(string)$row['id']] = $row;
 }
 
 $productIdMap = [];
 
-$ensureList = function (string $listId) use (&$listsById): array {
+$addProduct = function (string $name, ?string $categoryId) use ($pdo, &$productsByName, &$productsById): string {
+    $key = normalizeName($name);
+    if ($key !== '' && isset($productsByName[$key])) {
+        $existingId = $productsByName[$key];
+        if ($categoryId) {
+            $stmt = $pdo->prepare('UPDATE products SET category_id = :category_id WHERE id = :id');
+            $stmt->execute(['category_id' => $categoryId, 'id' => $existingId]);
+        }
+        return $existingId;
+    }
+    $id = nextProductId($pdo);
+    $stmt = $pdo->prepare('INSERT INTO products (id, name, category_id) VALUES (:id, :name, :category_id)');
+    $stmt->execute([
+        'id' => $id,
+        'name' => $name,
+        'category_id' => $categoryId
+    ]);
+    $productsByName[$key] = $id;
+    $productsById[$id] = ['id' => $id, 'name' => $name, 'category_id' => $categoryId];
+    return $id;
+};
+
+$ensureList = function (string $listId) use ($pdo, &$listsById): array {
     if (isset($listsById[$listId])) {
         return $listsById[$listId];
     }
-    $list = [
-        'id' => $listId,
-        'createdAt' => (new DateTimeImmutable())->format(DateTimeInterface::ATOM),
-        'items' => []
-    ];
-    $listsById[$listId] = $list;
-    return $list;
-};
-
-$updateList = function (array $list) use (&$listsById): void {
-    if (!isset($list['id'])) {
-        return;
-    }
-    $listsById[(string)$list['id']] = $list;
+    $createdAt = (new DateTimeImmutable())->format(DateTimeInterface::ATOM);
+    $stmt = $pdo->prepare('INSERT INTO lists (id, created_at, store_id) VALUES (:id, :created_at, NULL)');
+    $stmt->execute(['id' => $listId, 'created_at' => $createdAt]);
+    $listsById[$listId] = ['id' => $listId, 'created_at' => $createdAt, 'store_id' => null];
+    return $listsById[$listId];
 };
 
 $mapProductId = function (?string $localId) use (&$productIdMap): ?string {
@@ -84,27 +80,6 @@ $mapProductId = function (?string $localId) use (&$productIdMap): ?string {
         return null;
     }
     return $productIdMap[$localId] ?? $localId;
-};
-
-$addProduct = function (string $name, ?string $categoryId) use (&$productsByName, &$productsById, &$state, &$productIdMap, $pdo): string {
-    $key = normalizeName($name);
-    if ($key !== '' && isset($productsByName[$key])) {
-        $existingId = $productsByName[$key];
-        if ($categoryId && isset($productsById[$existingId])) {
-            $productsById[$existingId]['categoryId'] = $categoryId;
-        }
-        return $existingId;
-    }
-    $id = nextProductId($pdo);
-    $product = [
-        'id' => $id,
-        'name' => $name,
-        'categoryId' => $categoryId
-    ];
-    $state['products'][] = $product;
-    $productsByName[$key] = $id;
-    $productsById[$id] = $product;
-    return $id;
 };
 
 foreach ($events as $event) {
@@ -125,8 +100,9 @@ foreach ($events as $event) {
             }
             $id = (string)$category['id'];
             if (!isset($categoriesById[$id])) {
-                $state['categories'][] = $category;
-                $categoriesById[$id] = $category;
+                $stmt = $pdo->prepare('INSERT INTO categories (id, name) VALUES (:id, :name)');
+                $stmt->execute(['id' => $id, 'name' => (string)$category['name']]);
+                $categoriesById[$id] = true;
             }
             break;
         case 'unit:create':
@@ -136,8 +112,9 @@ foreach ($events as $event) {
             }
             $id = (string)$unit['id'];
             if (!isset($unitsById[$id])) {
-                $state['units'][] = $unit;
-                $unitsById[$id] = $unit;
+                $stmt = $pdo->prepare('INSERT INTO units (id, name) VALUES (:id, :name)');
+                $stmt->execute(['id' => $id, 'name' => (string)$unit['name']]);
+                $unitsById[$id] = true;
             }
             break;
         case 'unit:update':
@@ -146,37 +123,38 @@ foreach ($events as $event) {
             if ($unitId === '' || $name === '') {
                 break;
             }
-            foreach ($state['units'] as $index => $unit) {
-                if ((string)$unit['id'] === $unitId) {
-                    $state['units'][$index]['name'] = $name;
-                    break;
-                }
-            }
+            $stmt = $pdo->prepare('UPDATE units SET name = :name WHERE id = :id');
+            $stmt->execute(['name' => $name, 'id' => $unitId]);
             break;
         case 'unit:remove':
             $unitId = isset($payload['unitId']) ? (string)$payload['unitId'] : '';
             if ($unitId === '') {
                 break;
             }
-            $state['units'] = array_values(array_filter($state['units'], function ($unit) use ($unitId) {
-                return (string)$unit['id'] !== $unitId;
-            }));
+            $stmt = $pdo->prepare('DELETE FROM units WHERE id = :id');
+            $stmt->execute(['id' => $unitId]);
             break;
         case 'store:create':
             $store = $payload['store'] ?? null;
             if (!is_array($store) || !isset($store['id'], $store['name'])) {
                 break;
             }
-            $exists = false;
-            foreach ($state['stores'] as $existing) {
-                if ((string)$existing['id'] === (string)$store['id']) {
-                    $exists = true;
-                    break;
+            $id = (string)$store['id'];
+            $stmt = $pdo->prepare('INSERT OR IGNORE INTO stores (id, name) VALUES (:id, :name)');
+            $stmt->execute(['id' => $id, 'name' => (string)$store['name']]);
+            if (isset($store['categoryOrder']) && is_array($store['categoryOrder'])) {
+                $stmt = $pdo->prepare('DELETE FROM store_category_order WHERE store_id = :store_id');
+                $stmt->execute(['store_id' => $id]);
+                $insert = $pdo->prepare('INSERT INTO store_category_order (store_id, category_id, position) VALUES (:store_id, :category_id, :position)');
+                $position = 0;
+                foreach ($store['categoryOrder'] as $categoryId) {
+                    $insert->execute([
+                        'store_id' => $id,
+                        'category_id' => (string)$categoryId,
+                        'position' => $position
+                    ]);
+                    $position++;
                 }
-            }
-            if (!$exists) {
-                $store['categoryOrder'] = $store['categoryOrder'] ?? [];
-                $state['stores'][] = $store;
             }
             break;
         case 'store:order':
@@ -185,11 +163,17 @@ foreach ($events as $event) {
             if ($storeId === '' || !is_array($categoryIds)) {
                 break;
             }
-            foreach ($state['stores'] as $index => $store) {
-                if ((string)$store['id'] === $storeId) {
-                    $state['stores'][$index]['categoryOrder'] = array_values($categoryIds);
-                    break;
-                }
+            $stmt = $pdo->prepare('DELETE FROM store_category_order WHERE store_id = :store_id');
+            $stmt->execute(['store_id' => $storeId]);
+            $insert = $pdo->prepare('INSERT INTO store_category_order (store_id, category_id, position) VALUES (:store_id, :category_id, :position)');
+            $position = 0;
+            foreach ($categoryIds as $categoryId) {
+                $insert->execute([
+                    'store_id' => $storeId,
+                    'category_id' => (string)$categoryId,
+                    'position' => $position
+                ]);
+                $position++;
             }
             break;
         case 'product:create':
@@ -218,12 +202,8 @@ foreach ($events as $event) {
                 $categoryId = null;
             }
             $mappedId = $mapProductId($productId);
-            foreach ($state['products'] as $index => $product) {
-                if ((string)$product['id'] === $mappedId) {
-                    $state['products'][$index]['categoryId'] = $categoryId;
-                    break;
-                }
-            }
+            $stmt = $pdo->prepare('UPDATE products SET category_id = :category_id WHERE id = :id');
+            $stmt->execute(['category_id' => $categoryId, 'id' => $mappedId]);
             break;
         case 'product:remove':
             $productId = isset($payload['productId']) ? (string)$payload['productId'] : null;
@@ -231,15 +211,10 @@ foreach ($events as $event) {
                 break;
             }
             $mappedId = $mapProductId($productId);
-            $state['products'] = array_values(array_filter($state['products'], function ($product) use ($mappedId) {
-                return (string)$product['id'] !== $mappedId;
-            }));
-            foreach ($listsById as $listId => $list) {
-                $list['items'] = array_values(array_filter($list['items'], function ($item) use ($mappedId) {
-                    return (string)$item['productId'] !== $mappedId;
-                }));
-                $listsById[$listId] = $list;
-            }
+            $stmt = $pdo->prepare('DELETE FROM list_items WHERE product_id = :product_id');
+            $stmt->execute(['product_id' => $mappedId]);
+            $stmt = $pdo->prepare('DELETE FROM products WHERE id = :id');
+            $stmt->execute(['id' => $mappedId]);
             break;
         case 'list:create':
             $list = $payload['list'] ?? null;
@@ -248,8 +223,14 @@ foreach ($events as $event) {
             }
             $listId = (string)$list['id'];
             if (!isset($listsById[$listId])) {
-                $list['items'] = $list['items'] ?? [];
-                $listsById[$listId] = $list;
+                $createdAt = $list['createdAt'] ?? (new DateTimeImmutable())->format(DateTimeInterface::ATOM);
+                $stmt = $pdo->prepare('INSERT INTO lists (id, created_at, store_id) VALUES (:id, :created_at, :store_id)');
+                $stmt->execute([
+                    'id' => $listId,
+                    'created_at' => $createdAt,
+                    'store_id' => $list['storeId'] ?? null
+                ]);
+                $listsById[$listId] = ['id' => $listId, 'created_at' => $createdAt, 'store_id' => $list['storeId'] ?? null];
             }
             break;
         case 'list:store:set':
@@ -258,9 +239,9 @@ foreach ($events as $event) {
             if ($listId === '') {
                 break;
             }
-            $list = $ensureList($listId);
-            $list['storeId'] = $storeId ?: null;
-            $updateList($list);
+            $ensureList($listId);
+            $stmt = $pdo->prepare('UPDATE lists SET store_id = :store_id WHERE id = :id');
+            $stmt->execute(['store_id' => $storeId ?: null, 'id' => $listId]);
             break;
         case 'list:item:add':
             $listId = isset($payload['listId']) ? (string)$payload['listId'] : '';
@@ -269,7 +250,7 @@ foreach ($events as $event) {
             if ($listId === '' || !is_array($item) || !isset($item['id'], $item['productId'])) {
                 break;
             }
-            $list = $ensureList($listId);
+            $ensureList($listId);
             $productId = $mapProductId((string)$item['productId']);
             $productId = $productId ?: null;
             if ($productId === null || !isset($productsById[$productId])) {
@@ -280,48 +261,30 @@ foreach ($events as $event) {
             if ($productId === null) {
                 break;
             }
-            $exists = false;
-            foreach ($list['items'] as $existingItem) {
-                if ((string)$existingItem['id'] === (string)$item['id']) {
-                    $exists = true;
-                    break;
-                }
+            $stmt = $pdo->prepare('SELECT 1 FROM list_items WHERE id = :id');
+            $stmt->execute(['id' => (string)$item['id']]);
+            if ($stmt->fetchColumn()) {
+                break;
             }
-            if (!$exists) {
-                $item['productId'] = $productId;
-                $item['checked'] = (bool)($item['checked'] ?? false);
-                $item['quantity'] = isset($item['quantity']) ? max(1, (int)$item['quantity']) : 1;
-                $list['items'][] = $item;
-            }
-            $updateList($list);
+            $stmt = $pdo->prepare('INSERT INTO list_items (id, list_id, product_id, checked, quantity, note) VALUES (:id, :list_id, :product_id, :checked, :quantity, :note)');
+            $stmt->execute([
+                'id' => (string)$item['id'],
+                'list_id' => $listId,
+                'product_id' => $productId,
+                'checked' => (int)($item['checked'] ?? false),
+                'quantity' => max(1, (int)($item['quantity'] ?? 1)),
+                'note' => $item['note'] ?? null
+            ]);
             break;
         case 'list:item:toggle':
             $listId = isset($payload['listId']) ? (string)$payload['listId'] : '';
             $itemId = isset($payload['itemId']) ? (string)$payload['itemId'] : '';
-            $checked = isset($payload['checked']) ? (bool)$payload['checked'] : null;
+            $checked = isset($payload['checked']) ? (int)(bool)$payload['checked'] : null;
             if ($listId === '' || $itemId === '' || $checked === null) {
                 break;
             }
-            $list = $ensureList($listId);
-            foreach ($list['items'] as $index => $listItem) {
-                if ((string)$listItem['id'] === $itemId) {
-                    $list['items'][$index]['checked'] = $checked;
-                    break;
-                }
-            }
-            $updateList($list);
-            break;
-        case 'list:item:remove':
-            $listId = isset($payload['listId']) ? (string)$payload['listId'] : '';
-            $itemId = isset($payload['itemId']) ? (string)$payload['itemId'] : '';
-            if ($listId === '' || $itemId === '') {
-                break;
-            }
-            $list = $ensureList($listId);
-            $list['items'] = array_values(array_filter($list['items'], function ($listItem) use ($itemId) {
-                return (string)$listItem['id'] !== $itemId;
-            }));
-            $updateList($list);
+            $stmt = $pdo->prepare('UPDATE list_items SET checked = :checked WHERE id = :id AND list_id = :list_id');
+            $stmt->execute(['checked' => $checked, 'id' => $itemId, 'list_id' => $listId]);
             break;
         case 'list:item:quantity':
             $listId = isset($payload['listId']) ? (string)$payload['listId'] : '';
@@ -330,41 +293,52 @@ foreach ($events as $event) {
             if ($listId === '' || $itemId === '') {
                 break;
             }
-            $list = $ensureList($listId);
-            foreach ($list['items'] as $index => $listItem) {
-                if ((string)$listItem['id'] === $itemId) {
-                    $list['items'][$index]['quantity'] = max(1, $quantity);
-                    break;
-                }
-            }
-            $updateList($list);
+            $stmt = $pdo->prepare('UPDATE list_items SET quantity = :quantity WHERE id = :id AND list_id = :list_id');
+            $stmt->execute([
+                'quantity' => max(1, $quantity),
+                'id' => $itemId,
+                'list_id' => $listId
+            ]);
             break;
-        case 'settings:locale':
-            $locale = isset($payload['locale']) ? (string)$payload['locale'] : 'de';
-            $allowed = ['de', 'en', 'fr', 'es'];
-            $state['locale'] = in_array($locale, $allowed, true) ? $locale : 'de';
+        case 'list:item:remove':
+            $listId = isset($payload['listId']) ? (string)$payload['listId'] : '';
+            $itemId = isset($payload['itemId']) ? (string)$payload['itemId'] : '';
+            if ($listId === '' || $itemId === '') {
+                break;
+            }
+            $stmt = $pdo->prepare('DELETE FROM list_items WHERE id = :id AND list_id = :list_id');
+            $stmt->execute(['id' => $itemId, 'list_id' => $listId]);
             break;
         case 'list:remove':
             $listId = isset($payload['listId']) ? (string)$payload['listId'] : '';
             if ($listId === '') {
                 break;
             }
-            if (isset($listsById[$listId])) {
-                unset($listsById[$listId]);
+            $stmt = $pdo->prepare('DELETE FROM list_items WHERE list_id = :list_id');
+            $stmt->execute(['list_id' => $listId]);
+            $stmt = $pdo->prepare('DELETE FROM lists WHERE id = :id');
+            $stmt->execute(['id' => $listId]);
+            if ($activeListId === $listId) {
+                $activeListId = null;
             }
-            if (isset($state['activeListId']) && (string)$state['activeListId'] === $listId) {
-                $state['activeListId'] = null;
-            }
+            break;
+        case 'settings:locale':
+            $locale = isset($payload['locale']) ? (string)$payload['locale'] : 'de';
+            $allowed = ['de', 'en', 'fr', 'es'];
+            $locale = in_array($locale, $allowed, true) ? $locale : 'de';
+            $stmt = $pdo->prepare('UPDATE app_meta SET locale = :locale WHERE id = 1');
+            $stmt->execute(['locale' => $locale]);
             break;
         default:
             break;
     }
 }
 
-$state['lists'] = array_values($listsById);
-
 $revision = $revision + 1;
-saveState($pdo, $state, $revision);
+$stmt = $pdo->prepare('UPDATE app_meta SET revision = :revision, active_list_id = :active_list_id WHERE id = 1');
+$stmt->execute(['revision' => $revision, 'active_list_id' => $activeListId]);
+
+$pdo->commit();
 
 jsonResponse([
     'ok' => true,

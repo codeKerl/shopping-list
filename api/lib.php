@@ -14,53 +14,89 @@ function db(): PDO
 
 function ensureSchema(PDO $pdo): void
 {
-    $pdo->exec('CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS app_meta (id INTEGER PRIMARY KEY CHECK (id = 1), revision INTEGER NOT NULL DEFAULT 0, locale TEXT NOT NULL DEFAULT "de", active_list_id TEXT)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT NOT NULL)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS units (id TEXT PRIMARY KEY, name TEXT NOT NULL)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, name TEXT NOT NULL, category_id TEXT)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS stores (id TEXT PRIMARY KEY, name TEXT NOT NULL)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS store_category_order (store_id TEXT NOT NULL, category_id TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY (store_id, category_id))');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS lists (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, store_id TEXT)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS list_items (id TEXT PRIMARY KEY, list_id TEXT NOT NULL, product_id TEXT NOT NULL, checked INTEGER NOT NULL DEFAULT 0, quantity INTEGER NOT NULL DEFAULT 1, note TEXT)');
     $pdo->exec('CREATE TABLE IF NOT EXISTS product_seq (id INTEGER PRIMARY KEY AUTOINCREMENT)');
 
-    $stmt = $pdo->query('SELECT COUNT(*) AS count FROM app_state');
+    $stmt = $pdo->query('SELECT COUNT(*) AS count FROM app_meta');
     $count = (int)$stmt->fetch(PDO::FETCH_ASSOC)['count'];
     if ($count === 0) {
-        $empty = json_encode(emptyState());
-        $pdo->prepare('INSERT INTO app_state (id, json, revision) VALUES (1, :json, 0)')->execute(['json' => $empty]);
+        $pdo->prepare('INSERT INTO app_meta (id, revision, locale, active_list_id) VALUES (1, 0, "de", NULL)')->execute();
     }
 }
 
-function emptyState(): array
+function loadState(PDO $pdo): array
 {
-    return [
+    $meta = $pdo->query('SELECT revision, locale, active_list_id FROM app_meta WHERE id = 1')->fetch(PDO::FETCH_ASSOC);
+    if (!$meta) {
+        $meta = ['revision' => 0, 'locale' => 'de', 'active_list_id' => null];
+    }
+    $state = [
         'categories' => [],
         'units' => [],
         'products' => [],
         'stores' => [],
         'lists' => [],
-        'activeListId' => null,
-        'revision' => null,
-        'locale' => 'de'
+        'activeListId' => $meta['active_list_id'] ?? null,
+        'revision' => (string)$meta['revision'],
+        'locale' => $meta['locale'] ?? 'de'
     ];
-}
 
-function loadState(PDO $pdo): array
-{
-    $stmt = $pdo->query('SELECT json, revision FROM app_state WHERE id = 1');
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) {
-        return ['state' => emptyState(), 'revision' => 0];
+    $categories = $pdo->query('SELECT id, name FROM categories ORDER BY rowid')->fetchAll(PDO::FETCH_ASSOC);
+    $state['categories'] = $categories ?: [];
+
+    $units = $pdo->query('SELECT id, name FROM units ORDER BY rowid')->fetchAll(PDO::FETCH_ASSOC);
+    $state['units'] = $units ?: [];
+
+    $products = $pdo->query('SELECT id, name, category_id AS categoryId FROM products ORDER BY rowid')->fetchAll(PDO::FETCH_ASSOC);
+    $state['products'] = $products ?: [];
+
+    $stores = $pdo->query('SELECT id, name FROM stores ORDER BY rowid')->fetchAll(PDO::FETCH_ASSOC);
+    $storesWithOrder = [];
+    foreach ($stores as $store) {
+        $stmt = $pdo->prepare('SELECT category_id FROM store_category_order WHERE store_id = :store_id ORDER BY position');
+        $stmt->execute(['store_id' => $store['id']]);
+        $order = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $store['categoryOrder'] = $order ?: [];
+        $storesWithOrder[] = $store;
     }
-    $state = json_decode($row['json'], true);
-    if (!is_array($state)) {
-        $state = emptyState();
+    $state['stores'] = $storesWithOrder;
+
+    $lists = $pdo->query('SELECT id, created_at, store_id FROM lists ORDER BY datetime(created_at) DESC')->fetchAll(PDO::FETCH_ASSOC);
+    $listsById = [];
+    foreach ($lists as $list) {
+        $listsById[$list['id']] = [
+            'id' => $list['id'],
+            'createdAt' => $list['created_at'],
+            'storeId' => $list['store_id'] ?: null,
+            'items' => []
+        ];
     }
+    if (!empty($listsById)) {
+        $stmt = $pdo->query('SELECT id, list_id, product_id, checked, quantity, note FROM list_items ORDER BY rowid');
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (!isset($listsById[$row['list_id']])) {
+                continue;
+            }
+            $listsById[$row['list_id']]['items'][] = [
+                'id' => $row['id'],
+                'productId' => $row['product_id'],
+                'checked' => (bool)$row['checked'],
+                'quantity' => (int)$row['quantity'],
+                'note' => $row['note']
+            ];
+        }
+    }
+    $state['lists'] = array_values($listsById);
     $state['syncQueueCount'] = null;
-    return ['state' => $state, 'revision' => (int)$row['revision']];
-}
 
-function saveState(PDO $pdo, array $state, int $revision): void
-{
-    unset($state['syncQueueCount']);
-    $state['revision'] = (string)$revision;
-    $json = json_encode($state, JSON_UNESCAPED_UNICODE);
-    $stmt = $pdo->prepare('UPDATE app_state SET json = :json, revision = :revision WHERE id = 1');
-    $stmt->execute(['json' => $json, 'revision' => $revision]);
+    return ['state' => $state, 'revision' => (int)$meta['revision']];
 }
 
 function nextProductId(PDO $pdo): string
